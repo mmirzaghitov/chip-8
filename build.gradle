@@ -1,0 +1,18 @@
+plugins {
+    id 'java'
+}
+
+group 'md.mmirzaghitov.chip8'
+version '1.0-SNAPSHOT'
+
+sourceCompatibility = 1.10
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    compile 'org.openjfx:javafx-graphics:11:linux'
+    compile 'org.openjfx:javafx-base:11:linux'
+    testCompile group: 'junit', name: 'junit', version: '4.12'
+}
