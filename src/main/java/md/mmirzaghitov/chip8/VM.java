@@ -7,6 +7,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+
 import javafx.application.Application;
 import javafx.scene.Group;
 import javafx.scene.Scene;
@@ -16,7 +17,7 @@ public class VM extends Application {
 
 	private Display display = new Display(64, 32);
 	private Keyboard keyboard = new Keyboard();
-	private int[] memory = new int[2048];
+	private int[] memory = new int[4096];
 	private Cpu cpu = new Cpu(memory, display, keyboard);
 
 	private ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
@@ -27,11 +28,10 @@ public class VM extends Application {
 
 	public void loadProgram(InputStream inputStream) throws IOException {
 		byte[] buffer = new byte[4096];
-		int size = 0;
+		int size;
 		while ((size = inputStream.read(buffer)) != -1) {
-			for (int i = 0; i < size; i += 2) {
-				memory[0x200 + i / 2] = (buffer[i] << 8) | (buffer[i + 1]);
-				System.out.println(memory[0x200 + i / 2]);
+			for (int i = 0; i < size; i += 1) {
+				memory[0x200 + i] = buffer[i] & 0xFF;
 			}
 		}
 	}
@@ -46,7 +46,7 @@ public class VM extends Application {
 		primaryStage.setResizable(false);
 		primaryStage.show();
 
-		loadProgram(new FileInputStream("src/test/resources/15PUZZLE"));
+		loadProgram(new FileInputStream("src/test/resources/INVADERS"));
 		ScheduledFuture<?> scheduledFuture = executorService
 			 .scheduleAtFixedRate(cpu, 0, 1000 / 60, TimeUnit.MILLISECONDS);
 		primaryStage.setOnCloseRequest(e -> executorService.shutdownNow());

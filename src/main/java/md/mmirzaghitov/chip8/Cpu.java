@@ -58,7 +58,8 @@ public class Cpu implements Runnable {
 
 	@Override
 	public void run() {
-		int opcode = memory[pc];
+		int opcode = fetchOpcode();
+		System.out.println(Integer.toString(opcode, 16));
 		processOpcode(opcode);
 
 		if (dt > 0) {
@@ -70,7 +71,11 @@ public class Cpu implements Runnable {
 		}
 	}
 
-	public void processOpcode(int opcode) {
+	private int fetchOpcode() {
+		return (memory[pc] << 8) | memory[pc + 1];
+	}
+
+	private void processOpcode(int opcode) {
 		int prefix = (opcode & 0xF000) >> 12;
 		OPCodeProcessor opCodeProcessor = opcodeTable.get(prefix);
 		opCodeProcessor.process(opcode);
@@ -79,14 +84,25 @@ public class Cpu implements Runnable {
 	private void _00NN(int opcode) {
 		int suffix = opcode & 0x000F;
 
-		if (suffix == 0x0) {
-			display.clearScreen();
+		switch (suffix) {
+			case 0x0:
+				display.clearScreen();
+				break;
+
+			case 0xE:
+				pc = stack[sc] + 2;
+				stack[sc] = 0;
+				sc = 0;
+				break;
+			default:
+				throw new IllegalArgumentException("Not supported opcode");
 		}
 		pc += 2;
 	}
 
 	private void _1NNN(int opcode) {
 		pc = opcode & 0x0FFF;
+		System.out.println("============================= Jump =================================");
 	}
 
 	private void _2NNN(int opcode) {
@@ -136,84 +152,79 @@ public class Cpu implements Runnable {
 
 	private void _8NNN(int opcode) {
 		int suffix = opcode & 0x000F;
+		int x = (opcode & 0x0F00) >> 8;
+		int y = (opcode & 0x00F0) >> 4;
 
-		if (suffix == 0x0) {
-			int x = (opcode & 0x0F00) >> 8;
-			int y = (opcode & 0x00F0) >> 4;
-			registers[x] = registers[y];
-			pc += 2;
-		}
+		switch (suffix) {
+			case 0x0:
+				registers[x] = registers[y];
+				pc += 2;
+				break;
 
-		if (suffix == 0x1) {
-			int x = (opcode & 0x0F00) >> 8;
-			int y = (opcode & 0x00F0) >> 4;
-			registers[x] = registers[x] | registers[y];
-			pc += 2;
-		}
+			case 0x1:
+				registers[x] = registers[x] | registers[y];
+				pc += 2;
+				break;
 
-		if (suffix == 0x2) {
-			int x = (opcode & 0x0F00) >> 8;
-			int y = (opcode & 0x00F0) >> 4;
-			registers[x] = registers[x] & registers[y];
-			pc += 2;
-		}
+			case 0x2:
+				registers[x] = registers[x] & registers[y];
+				pc += 2;
+				break;
 
-		if (suffix == 0x3) {
-			int x = (opcode & 0x0F00) >> 8;
-			int y = (opcode & 0x00F0) >> 4;
-			registers[x] = registers[x] ^ registers[y];
-			pc += 2;
-		}
+			case 0x3:
+				registers[x] = registers[x] ^ registers[y];
+				pc += 2;
+				break;
 
-		if (suffix == 0x4) {
-			int x = (opcode & 0x0F00) >> 8;
-			int y = (opcode & 0x00F0) >> 4;
-			int res = registers[x] + registers[y];
-			if (res > 256) {
-				registers[0xF] = 1;
+			case 0x4: {
+				int res = registers[x] + registers[y];
+				if (res > 256) {
+					registers[0xF] = 1;
+				}
+				registers[x] = res & 0xFF;
+				pc += 2;
+				break;
 			}
-			registers[x] = res & 0xFF;
-			pc += 2;
-		}
 
-		if (suffix == 0x5) {
-			int x = (opcode & 0x0F00) >> 8;
-			int y = (opcode & 0x00F0) >> 4;
-			int res = registers[x] - registers[y];
-			if (res < 0) {
-				registers[0xF] = 0;
-			} else {
-				registers[0xF] = 1;
+			case 0x5:
+				int res = registers[x] - registers[y];
+				if (res < 0) {
+					registers[0xF] = 0;
+				} else {
+					registers[0xF] = 1;
+				}
+				registers[x] = res & 0xFF;
+				pc += 2;
+				break;
+
+			case 0x6:
+				registers[0xF] = registers[x] & 1;
+				registers[x] = registers[x] >> 1;
+				pc += 2;
+				break;
+
+			case 0x7: {
+				int res1 = registers[y] - registers[x];
+				if (res1 < 0) {
+					registers[0xF] = 0;
+				} else {
+					registers[0xF] = 1;
+				}
+				registers[x] = res1 & 0xFF;
+				pc += 2;
+				break;
 			}
-			registers[x] = res & 0xFF;
-			pc += 2;
-		}
 
-		if (suffix == 0x6) {
-			int x = (opcode & 0x0F00) >> 8;
-			registers[0xF] = registers[x] & 1;
-			registers[x] = registers[x] >> 1;
-			pc += 2;
-		}
-
-		if (suffix == 0x7) {
-			int x = (opcode & 0x0F00) >> 8;
-			int y = (opcode & 0x00F0) >> 4;
-			int res = registers[y] - registers[x];
-			if (res < 0) {
-				registers[0xF] = 0;
-			} else {
-				registers[0xF] = 1;
+			case 0xE: {
+				registers[0xF] = registers[x] & 1;
+				registers[x] = registers[x] >> 1;
+				pc += 2;
+				break;
 			}
-			registers[x] = res & 0xFF;
-			pc += 2;
-		}
 
-		if (suffix == 0xE) {
-			int x = (opcode & 0x0F00) >> 8;
-			registers[0xF] = registers[x] & 1;
-			registers[x] = registers[x] >> 1;
-			pc += 2;
+			default: {
+				throw new IllegalArgumentException("Not supported opcode");
+			}
 		}
 	}
 
@@ -228,8 +239,7 @@ public class Cpu implements Runnable {
 	}
 
 	private void _ANNN(int opcode) {
-		int addr = opcode & 0x0FFF;
-		ireg = memory[addr];
+		ireg = opcode & 0x0FFF;
 		pc += 2;
 	}
 
@@ -242,6 +252,7 @@ public class Cpu implements Runnable {
 		int x = (opcode & 0x0F00) >> 8;
 		int addr = opcode & 0x00FF;
 		registers[x] = addr & random.nextInt(256);
+		pc += 2;
 	}
 
 	private void _DXYN(int opcode) {
@@ -254,8 +265,10 @@ public class Cpu implements Runnable {
 
 		for (int i = 0; i < n; i++) {
 			int val = memory[lreg + i];
-			for (int j = 8; j > 0; j--) {
-				flip |= display.setPixel(x + j, y + i, val >> j);
+			for (int j = 7; j >= 0; j--) {
+				if (registers[x] + 7 - j < 64 && registers[y] + i < 32) {
+					flip |= display.setPixel(registers[x] + 7 - j, registers[y] + i, (val >> j) & 1);
+				}
 			}
 		}
 
@@ -268,14 +281,26 @@ public class Cpu implements Runnable {
 		int x = (opcode & 0x0F00) >> 8;
 		int suffix = opcode & 0xF;
 
-		if (suffix == 0xE && keyboard.isKeyPressed(registers[x])) {
-			pc += 2;
-		}
+		switch (suffix) {
+			case 0xE:
+				if (keyboard.isKeyPressed(registers[x])) {
+					pc += 2;
+				} else {
+					System.out.println("pressed");
+				}
+				break;
 
-		if (suffix == 0x1 && !keyboard.isKeyPressed(registers[x])) {
-			pc += 2;
-		}
+			case 0x1:
+				if (!keyboard.isKeyPressed(registers[x])) {
+					pc += 2;
+				} else {
+					System.out.println("pressed");
+				}
+				break;
 
+			default:
+				throw new IllegalArgumentException("Unsupported opcode");
+		}
 		pc += 2;
 	}
 
@@ -283,46 +308,43 @@ public class Cpu implements Runnable {
 		int x = (opcode & 0x0F00) >> 8;
 		int suffix = opcode & 0xFF;
 
-		if (suffix == 0x07) {
-			registers[x] = dt;
-		}
+		switch (suffix) {
 
-		if (suffix == 0x0A) {
-			registers[x] = keyboard.waitUntilPressed();
-		}
+			case 0x07:
+				registers[x] = dt;
+				break;
+			case 0x0A:
+				registers[x] = keyboard.waitUntilPressed();
+				break;
+			case 0x15:
+				dt = registers[x];
+				break;
+			case 0x18:
+				st = registers[x];
+				break;
+			case 0x1E:
+				ireg += registers[x];
+				break;
+			case 0x29:
+				throw new IllegalArgumentException("Not implemented");
+			case 0x33:
+				memory[ireg] = registers[x] / 100;
+				memory[ireg + 1] = (registers[x] % 100) / 10;
+				memory[ireg + 2] = (registers[x] % 100) % 10;
+				break;
+			case 0x55:
+				for (int i = 0; i <= x; i++) {
+					memory[ireg + i] = registers[i];
+				}
+				break;
+			case 0x65:
+				for (int i = 0; i <= x; i++) {
+					registers[i] = memory[ireg + i];
+				}
+				break;
+			default:
+				throw new IllegalArgumentException("Not implemented");
 
-		if (suffix == 0x15) {
-			dt = registers[x];
-		}
-
-		if (suffix == 0x18) {
-			st = registers[x];
-		}
-
-		if (suffix == 0x1E) {
-			ireg += registers[x];
-		}
-
-		if (suffix == 0x29) {
-			ireg = 0; //TODO add fonts
-		}
-
-		if (suffix == 0x33) {
-			memory[ireg] = registers[x] / 100;
-			memory[ireg + 1] = (registers[x] % 100) / 10;
-			memory[ireg + 2] = (registers[x] % 100) % 10;
-		}
-
-		if (suffix == 0x55) {
-			for (int i = 0; i < registers.length; i++) {
-				memory[ireg + i] = registers[i];
-			}
-		}
-
-		if (suffix == 0x65) {
-			for (int i = 0; i < registers.length; i++) {
-				registers[i] = memory[ireg + i];
-			}
 		}
 		pc += 2;
 	}

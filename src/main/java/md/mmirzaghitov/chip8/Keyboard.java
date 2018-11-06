@@ -63,19 +63,26 @@ public class Keyboard {
 					keyPressed = i;
 				}
 			}
-			keyPressedCondition.signalAll();
-			keyPressedMap.get(keyEvent.getCode()).set(true);
+			if (keyPressedMap.containsKey(keyEvent.getCode())) {
+				keyPressedCondition.signalAll();
+				keyPressedMap.get(keyEvent.getCode()).set(true);
+			}
 		} finally {
 			lock.unlock();
 		}
 	}
 
 	public void keyReleased(KeyEvent keyEvent) {
-		keyPressedMap.get(keyEvent.getCode()).set(false);
-		keyPressed = -1;
+		if (keyPressedMap.containsKey(keyEvent.getCode())) {
+			keyPressedMap.get(keyEvent.getCode()).set(false);
+			keyPressed = -1;
+		}
 	}
 
 	public boolean isKeyPressed(int key) {
+		if (key > keys.length) {
+			return false;
+		}
 		return keyPressedMap.get(keys[key]).get();
 	}
 
