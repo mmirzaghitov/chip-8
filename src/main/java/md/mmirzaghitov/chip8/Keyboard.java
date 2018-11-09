@@ -83,7 +83,9 @@ public class Keyboard {
 		if (key > keys.length) {
 			return false;
 		}
-		return keyPressedMap.get(keys[key]).get();
+		boolean b = keyPressedMap.get(keys[key]).get();
+		keyPressedMap.get(keys[key]).set(false);
+		return b;
 	}
 
 	public int waitUntilPressed() {

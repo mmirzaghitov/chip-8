@@ -76,7 +76,7 @@ public class Cpu implements Runnable {
 	}
 
 	private void processOpcode(int opcode) {
-		int prefix = (opcode & 0xF000) >> 12;
+		int prefix = (opcode & 0xF000) >>> 12;
 		OPCodeProcessor opCodeProcessor = opcodeTable.get(prefix);
 		opCodeProcessor.process(opcode);
 	}
@@ -90,9 +90,7 @@ public class Cpu implements Runnable {
 				break;
 
 			case 0xE:
-				pc = stack[sc] + 2;
-				stack[sc] = 0;
-				sc = 0;
+				pc = stack[sc--];
 				break;
 			default:
 				throw new IllegalArgumentException("Not supported opcode");
@@ -102,7 +100,6 @@ public class Cpu implements Runnable {
 
 	private void _1NNN(int opcode) {
 		pc = opcode & 0x0FFF;
-		System.out.println("============================= Jump =================================");
 	}
 
 	private void _2NNN(int opcode) {
@@ -111,7 +108,7 @@ public class Cpu implements Runnable {
 	}
 
 	private void _3NNN(int opcode) {
-		int x = (opcode & 0x0F00) >> 8;
+		int x = (opcode & 0x0F00) >>> 8;
 		if (registers[x] == (opcode & 0x00FF)) {
 			pc += 4;
 		} else {
@@ -120,7 +117,7 @@ public class Cpu implements Runnable {
 	}
 
 	private void _4NNN(int opcode) {
-		int x = (opcode & 0x0F00) >> 8;
+		int x = (opcode & 0x0F00) >>> 8;
 		if (registers[x] != (opcode & 0x00FF)) {
 			pc += 4;
 		} else {
@@ -129,8 +126,8 @@ public class Cpu implements Runnable {
 	}
 
 	private void _5NNN(int opcode) {
-		int x = (opcode & 0x0F00) >> 8;
-		int y = (opcode & 0x00F0) >> 4;
+		int x = (opcode & 0x0F00) >>> 8;
+		int y = (opcode & 0x00F0) >>> 4;
 		if (registers[x] == registers[y]) {
 			pc += 4;
 		} else {
@@ -139,21 +136,24 @@ public class Cpu implements Runnable {
 	}
 
 	private void _6NNN(int opcode) {
-		int x = (opcode & 0x0F00) >> 8;
+		int x = (opcode & 0x0F00) >>> 8;
 		registers[x] = opcode & 0x00FF;
 		pc += 2;
 	}
 
 	private void _7NNN(int opcode) {
-		int x = (opcode & 0x0F00) >> 8;
+		int x = (opcode & 0x0F00) >>> 8;
 		registers[x] += opcode & 0x00FF;
+		if (registers[x] > 256) {
+			registers[x] = 256 - registers[x];
+		}
 		pc += 2;
 	}
 
 	private void _8NNN(int opcode) {
 		int suffix = opcode & 0x000F;
-		int x = (opcode & 0x0F00) >> 8;
-		int y = (opcode & 0x00F0) >> 4;
+		int x = (opcode & 0x0F00) >>> 8;
+		int y = (opcode & 0x00F0) >>> 4;
 
 		switch (suffix) {
 			case 0x0:
@@ -178,8 +178,10 @@ public class Cpu implements Runnable {
 
 			case 0x4: {
 				int res = registers[x] + registers[y];
-				if (res > 256) {
+				if (res > 0xFF) {
 					registers[0xF] = 1;
+				} else {
+					registers[0xF] = 0;
 				}
 				registers[x] = res & 0xFF;
 				pc += 2;
@@ -199,7 +201,7 @@ public class Cpu implements Runnable {
 
 			case 0x6:
 				registers[0xF] = registers[x] & 1;
-				registers[x] = registers[x] >> 1;
+				registers[x] = registers[x] >>> 1;
 				pc += 2;
 				break;
 
@@ -217,7 +219,7 @@ public class Cpu implements Runnable {
 
 			case 0xE: {
 				registers[0xF] = registers[x] & 1;
-				registers[x] = registers[x] >> 1;
+				registers[x] = (registers[x] << 1) & 0xFF;
 				pc += 2;
 				break;
 			}
@@ -229,8 +231,8 @@ public class Cpu implements Runnable {
 	}
 
 	private void _9NNN(int opcode) {
-		int x = (opcode & 0x0F00) >> 8;
-		int y = (opcode & 0x00F0) >> 4;
+		int x = (opcode & 0x0F00) >>> 8;
+		int y = (opcode & 0x00F0) >>> 4;
 		if (registers[x] != registers[y]) {
 			pc += 4;
 		} else {
@@ -249,15 +251,15 @@ public class Cpu implements Runnable {
 	}
 
 	private void _CXNN(int opcode) {
-		int x = (opcode & 0x0F00) >> 8;
+		int x = (opcode & 0x0F00) >>> 8;
 		int addr = opcode & 0x00FF;
-		registers[x] = addr & random.nextInt(256);
+		registers[x] = (addr & random.nextInt(256)) & 0xFF;
 		pc += 2;
 	}
 
 	private void _DXYN(int opcode) {
-		int x = (opcode & 0x0F00) >> 8;
-		int y = (opcode & 0x00F0) >> 4;
+		int x = (opcode & 0x0F00) >>> 8;
+		int y = (opcode & 0x00F0) >>> 4;
 		int n = opcode & 0x000F;
 
 		int lreg = ireg;
@@ -278,7 +280,7 @@ public class Cpu implements Runnable {
 	}
 
 	private void _EXNN(int opcode) {
-		int x = (opcode & 0x0F00) >> 8;
+		int x = (opcode & 0x0F00) >>> 8;
 		int suffix = opcode & 0xF;
 
 		switch (suffix) {
@@ -305,13 +307,13 @@ public class Cpu implements Runnable {
 	}
 
 	private void _FXNN(int opcode) {
-		int x = (opcode & 0x0F00) >> 8;
+		int x = (opcode & 0x0F00) >>> 8;
 		int suffix = opcode & 0xFF;
 
 		switch (suffix) {
 
 			case 0x07:
-				registers[x] = dt;
+				registers[x] = dt & 0xFF;
 				break;
 			case 0x0A:
 				registers[x] = keyboard.waitUntilPressed();
@@ -339,7 +341,7 @@ public class Cpu implements Runnable {
 				break;
 			case 0x65:
 				for (int i = 0; i <= x; i++) {
-					registers[i] = memory[ireg + i];
+					registers[i] = memory[ireg + i] & 0xFF;
 				}
 				break;
 			default:

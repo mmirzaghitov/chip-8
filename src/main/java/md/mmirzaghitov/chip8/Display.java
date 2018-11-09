@@ -25,6 +25,11 @@ public class Display extends Canvas {
 	}
 
 	public void clearScreen() {
+		for (int i = 0; i < y; i++) {
+			for (int j = 0; j < x; j++) {
+				grid[i][j] = 0;
+			}
+		}
 		graphicsContext.setFill(Color.BLACK);
 		graphicsContext.fillRect(0, 0, getWidth(), getHeight());
 	}
@@ -38,7 +43,8 @@ public class Display extends Canvas {
 	}
 
 	public void render() {
-		clearScreen();
+		graphicsContext.setFill(Color.BLACK);
+		graphicsContext.fillRect(0, 0, getWidth(), getHeight());
 		graphicsContext.setFill(Color.WHITE);
 		for (int i = 0; i < y; i++) {
 			for (int j = 0; j < x; j++) {

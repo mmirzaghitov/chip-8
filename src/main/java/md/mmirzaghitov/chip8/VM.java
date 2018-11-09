@@ -52,7 +52,7 @@ public class VM extends Application {
 		primaryStage.setOnCloseRequest(e -> executorService.shutdownNow());
 
 		scene.setOnKeyPressed(keyboard::keyPressed);
-		scene.setOnKeyReleased(keyboard::keyReleased);
+	//	scene.setOnKeyReleased(keyboard::keyReleased);
 	}
 
 }
