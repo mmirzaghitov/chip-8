@@ -17,9 +17,6 @@ import static javafx.scene.input.KeyCode.W;
 import static javafx.scene.input.KeyCode.X;
 import static javafx.scene.input.KeyCode.Z;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 import javafx.scene.input.KeyCode;
@@ -28,32 +25,11 @@ import javafx.scene.input.KeyEvent;
 public class Keyboard {
 
 	private KeyCode[] keys = new KeyCode[]{DIGIT1, DIGIT2, DIGIT3, DIGIT4, Q, W, E, R, A, S, D, F, Z, X, C, V};
+	private volatile boolean[] keysPressed = new boolean[16];
 
 	private ReentrantLock lock = new ReentrantLock();
 	private volatile Condition keyPressedCondition = lock.newCondition();
 	private volatile int keyPressed = -1;
-
-	private Map<KeyCode, AtomicBoolean> keyPressedMap = new LinkedHashMap<>();
-
-	{
-		keyPressedMap.put(DIGIT1, new AtomicBoolean());
-		keyPressedMap.put(DIGIT2, new AtomicBoolean());
-		keyPressedMap.put(DIGIT3, new AtomicBoolean());
-		keyPressedMap.put(DIGIT4, new AtomicBoolean());
-		keyPressedMap.put(Q, new AtomicBoolean());
-		keyPressedMap.put(W, new AtomicBoolean());
-		keyPressedMap.put(E, new AtomicBoolean());
-		keyPressedMap.put(R, new AtomicBoolean());
-		keyPressedMap.put(A, new AtomicBoolean());
-		keyPressedMap.put(S, new AtomicBoolean());
-		keyPressedMap.put(D, new AtomicBoolean());
-		keyPressedMap.put(F, new AtomicBoolean());
-		keyPressedMap.put(Z, new AtomicBoolean());
-		keyPressedMap.put(X, new AtomicBoolean());
-		keyPressedMap.put(C, new AtomicBoolean());
-		keyPressedMap.put(V, new AtomicBoolean());
-
-	}
 
 	public void keyPressed(KeyEvent keyEvent) {
 		lock.lock();
@@ -63,19 +39,13 @@ public class Keyboard {
 					keyPressed = i;
 				}
 			}
-			if (keyPressedMap.containsKey(keyEvent.getCode())) {
+
+			if (keyPressed > 0) {
 				keyPressedCondition.signalAll();
-				keyPressedMap.get(keyEvent.getCode()).set(true);
+				keysPressed[keyPressed] = true;
 			}
 		} finally {
 			lock.unlock();
-		}
-	}
-
-	public void keyReleased(KeyEvent keyEvent) {
-		if (keyPressedMap.containsKey(keyEvent.getCode())) {
-			keyPressedMap.get(keyEvent.getCode()).set(false);
-			keyPressed = -1;
 		}
 	}
 
@@ -83,8 +53,8 @@ public class Keyboard {
 		if (key > keys.length) {
 			return false;
 		}
-		boolean b = keyPressedMap.get(keys[key]).get();
-		keyPressedMap.get(keys[key]).set(false);
+		boolean b = keysPressed[key];
+		keysPressed[key] = false;
 		return b;
 	}
 

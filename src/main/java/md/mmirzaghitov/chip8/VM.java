@@ -48,11 +48,11 @@ public class VM extends Application {
 
 		loadProgram(new FileInputStream("src/test/resources/INVADERS"));
 		ScheduledFuture<?> scheduledFuture = executorService
-			 .scheduleAtFixedRate(cpu, 0, 1000 / 60, TimeUnit.MILLISECONDS);
+			 .scheduleAtFixedRate(cpu, 0, 1000 / 500, TimeUnit.MILLISECONDS);
 		primaryStage.setOnCloseRequest(e -> executorService.shutdownNow());
 
 		scene.setOnKeyPressed(keyboard::keyPressed);
-	//	scene.setOnKeyReleased(keyboard::keyReleased);
+		//	scene.setOnKeyReleased(keyboard::keyReleased);
 	}
 
 }

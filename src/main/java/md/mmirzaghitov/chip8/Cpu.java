@@ -1,10 +1,7 @@
 package md.mmirzaghitov.chip8;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Random;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.TimeUnit;
 
 public class Cpu implements Runnable {
 
@@ -24,31 +21,16 @@ public class Cpu implements Runnable {
 
 	private Random random = new Random();
 
-	private Map<Integer, OPCodeProcessor> opcodeTable = new HashMap<>();
+	private long cycleCount;
 
-	private ReentrantLock lock = new ReentrantLock();
+	private boolean draw;
 
-	Condition condition = lock.newCondition();
-
-	{
-		opcodeTable.put(0x0, this::_00NN);
-		opcodeTable.put(0x1, this::_1NNN);
-		opcodeTable.put(0x2, this::_2NNN);
-		opcodeTable.put(0x3, this::_3NNN);
-		opcodeTable.put(0x4, this::_4NNN);
-		opcodeTable.put(0x5, this::_5NNN);
-		opcodeTable.put(0x6, this::_6NNN);
-		opcodeTable.put(0x7, this::_7NNN);
-		opcodeTable.put(0x8, this::_8NNN);
-		opcodeTable.put(0x9, this::_9NNN);
-		opcodeTable.put(0xA, this::_ANNN);
-		opcodeTable.put(0xB, this::_BNNN);
-		opcodeTable.put(0xC, this::_CXNN);
-		opcodeTable.put(0xD, this::_DXYN);
-		opcodeTable.put(0xE, this::_EXNN);
-		opcodeTable.put(0xF, this::_FXNN);
-
-	}
+	private OPCodeProcessor[] opcodeTable = new OPCodeProcessor[]{
+		 this::_00NN, this::_1NNN, this::_2NNN, this::_3NNN,
+		 this::_4NNN, this::_5NNN, this::_6NNN, this::_7NNN,
+		 this::_8NNN, this::_9NNN, this::_ANNN, this::_BNNN,
+		 this::_CXNN, this::_DXYN, this::_EXNN, this::_FXNN
+	};
 
 	public Cpu(int[] memory, Display display, Keyboard keyboard) {
 		this.memory = memory;
@@ -59,16 +41,25 @@ public class Cpu implements Runnable {
 	@Override
 	public void run() {
 		int opcode = fetchOpcode();
-		System.out.println(Integer.toString(opcode, 16));
+		//	System.out.println(Integer.toString(opcode, 16));
 		processOpcode(opcode);
 
-		if (dt > 0) {
-			dt--;
-		}
+		if (cycleCount > 8) {
+			if (draw) {
+				display.render();
+				draw = false;
+			}
 
-		if (st > 0) {
-			st--;
+			if (dt > 0) {
+				dt--;
+			}
+
+			if (st > 0) {
+				st--;
+			}
+			cycleCount = 0;
 		}
+		cycleCount++;
 	}
 
 	private int fetchOpcode() {
@@ -76,9 +67,13 @@ public class Cpu implements Runnable {
 	}
 
 	private void processOpcode(int opcode) {
-		int prefix = (opcode & 0xF000) >>> 12;
-		OPCodeProcessor opCodeProcessor = opcodeTable.get(prefix);
-		opCodeProcessor.process(opcode);
+		try {
+			int prefix = (opcode & 0xF000) >>> 12;
+			OPCodeProcessor opCodeProcessor = opcodeTable[prefix];
+			opCodeProcessor.process(opcode);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 
 	private void _00NN(int opcode) {
@@ -143,10 +138,7 @@ public class Cpu implements Runnable {
 
 	private void _7NNN(int opcode) {
 		int x = (opcode & 0x0F00) >>> 8;
-		registers[x] += opcode & 0x00FF;
-		if (registers[x] > 256) {
-			registers[x] = 256 - registers[x];
-		}
+		registers[x] = (registers[x] + (opcode & 0xFF)) & 0xFF;
 		pc += 2;
 	}
 
@@ -262,41 +254,39 @@ public class Cpu implements Runnable {
 		int y = (opcode & 0x00F0) >>> 4;
 		int n = opcode & 0x000F;
 
-		int lreg = ireg;
 		int flip = 0;
 
 		for (int i = 0; i < n; i++) {
-			int val = memory[lreg + i];
+			int val = memory[ireg + i];
 			for (int j = 7; j >= 0; j--) {
-				if (registers[x] + 7 - j < 64 && registers[y] + i < 32) {
-					flip |= display.setPixel(registers[x] + 7 - j, registers[y] + i, (val >> j) & 1);
-				}
+				int the_x = (registers[x] + 7 - j) & 63;
+				int the_y = (registers[y] + i) & 31;
+				int pixelVal = (val >> j) & 1;
+//				if (the_x < 64 && the_y < 32) {
+				flip |= display.setPixel(the_x, the_y, pixelVal);
+//				}
 			}
 		}
-
-		display.render();
 		registers[0xF] = flip;
 		pc += 2;
+		draw = true;
 	}
 
 	private void _EXNN(int opcode) {
 		int x = (opcode & 0x0F00) >>> 8;
 		int suffix = opcode & 0xF;
-
+		System.out.println("===================" + TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis()));
 		switch (suffix) {
 			case 0xE:
 				if (keyboard.isKeyPressed(registers[x])) {
-					pc += 2;
-				} else {
 					System.out.println("pressed");
+					pc += 2;
 				}
 				break;
 
 			case 0x1:
 				if (!keyboard.isKeyPressed(registers[x])) {
 					pc += 2;
-				} else {
-					System.out.println("pressed");
 				}
 				break;
 
@@ -328,7 +318,8 @@ public class Cpu implements Runnable {
 				ireg += registers[x];
 				break;
 			case 0x29:
-				throw new IllegalArgumentException("Not implemented");
+				System.out.println("Not implemented");
+				break;
 			case 0x33:
 				memory[ireg] = registers[x] / 100;
 				memory[ireg + 1] = (registers[x] % 100) / 10;
